@@ -1,0 +1,144 @@
+### Health check
+GET http://localhost:3000/health
+
+###
+### Tool – fetch_showing_requests (by status)
+POST http://localhost:3000/api/tools/run
+Content-Type: application/json
+
+{
+  "name": "fetch_showing_requests",
+  "args": {
+    "status": "pending",
+    "limit": 20
+  }
+}
+
+###
+### Tool – fetch_showing_requests (by id)
+POST http://localhost:3000/api/tools/run
+Content-Type: application/json
+
+{
+  "name": "fetch_showing_requests",
+  "args": {
+    "id": "38227059-b21e-42e4-8c13-28654a0d7bbc"
+  }
+}
+
+###
+### Tool – fetch_showing_requests (by property_id)
+POST http://localhost:3000/api/tools/run
+Content-Type: application/json
+
+{
+  "name": "fetch_showing_requests",
+  "args": {
+    "propertyId": "C12699340"
+  }
+}
+
+###
+### Tool – fetch_showing_requests (by group_name)
+POST http://localhost:3000/api/tools/run
+Content-Type: application/json
+
+{
+  "name": "fetch_showing_requests",
+  "args": {
+    "groupName": "default"
+  }
+}
+
+###
+### Tool – get_conversation_context
+POST http://localhost:3000/api/tools/run
+Content-Type: application/json
+
+{
+  "name": "get_conversation_context",
+  "args": {
+    "showingIds": "38227059-b21e-42e4-8c13-28654a0d7bbc,eda89b8f-de81-4c12-bce6-4ab2349b0199"
+  }
+}
+
+###
+### Tool – update_showings
+POST http://localhost:3000/api/tools/run
+Content-Type: application/json
+
+{
+  "name": "update_showings",
+  "args": {
+    "showingIds": "38227059-b21e-42e4-8c13-28654a0d7bbc,eda89b8f-de81-4c12-bce6-4ab2349b0199",
+    "category": "Canceled Showings",
+    "status": "Unavailable - Tenanted",
+    "releaseSpecialist": true,
+    "triggerRoutePlan": true
+  }
+}
+
+###
+### Tool – update_property_records
+POST http://localhost:3000/api/tools/run
+Content-Type: application/json
+
+{
+  "name": "update_property_records",
+  "args": {
+    "propertyIds": "property-1,property-2",
+    "petsAllowed": true,
+    "offerRequirements": "Landlord requires move-in within 30 days."
+  }
+}
+
+###
+### Tool – manage_rental_specialist
+POST http://localhost:3000/api/tools/run
+Content-Type: application/json
+
+{
+  "name": "manage_rental_specialist",
+  "args": {
+    "action": "release",
+    "showingIds": "uuid-1,uuid-2"
+  }
+}
+
+###
+### Tool – trigger_workflow
+POST http://localhost:3000/api/tools/run
+Content-Type: application/json
+
+{
+  "name": "trigger_workflow",
+  "args": {
+    "workflowName": "Showings Route Plan - Final",
+    "context": "uuid-1,uuid-2"
+  }
+}
+
+###
+### Tool – set_tag
+POST http://localhost:3000/api/tools/run
+Content-Type: application/json
+
+{
+  "name": "set_tag",
+  "args": {
+    "tag": "C",
+    "showingIds": "uuid-1,uuid-2"
+  }
+}
+
+###
+### Tool – fetch_property_details (by backend property ID)
+POST http://localhost:3000/api/tools/run
+Content-Type: application/json
+
+{
+  "name": "fetch_property_details",
+  "args": {
+    "propertyId": "C12699340" 
+  }
+}
