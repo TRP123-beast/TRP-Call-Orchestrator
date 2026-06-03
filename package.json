@@ -6,7 +6,9 @@
     "text:dev": "tsx src/text-demo.ts",
     "livekit:download-files": "tsx src/livekit/main.ts download-files",
     "livekit:dev": "tsx src/livekit/main.ts dev",
-    "livekit:start": "tsx src/livekit/main.ts start"
+    "livekit:start": "tsx src/livekit/main.ts start",
+    "livekit:server": "./start-livekit.sh",
+    "test:livekit": "tsx src/test-livekit-connection.ts"
   },
   "devDependencies": {
     "@types/express": "^5.0.6",
@@ -26,6 +28,7 @@
     "axios": "^1.13.5",
     "dotenv": "^17.3.1",
     "express": "^5.2.1",
+    "livekit-server-sdk": "^2.15.4",
     "openai": "^4.79.1",
     "winston": "^3.19.0",
     "zod": "^3.25.76"
