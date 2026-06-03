@@ -8,6 +8,8 @@
     "livekit:dev": "tsx src/livekit/main.ts dev",
     "livekit:start": "tsx src/livekit/main.ts start",
     "livekit:server": "./start-livekit.sh",
+    "livekit:test-playground": "tsx src/livekit/create-test-room.ts",
+    "livekit:test-outbound": "tsx src/livekit/test-outbound.ts",
     "test:livekit": "tsx src/test-livekit-connection.ts"
   },
   "devDependencies": {
@@ -30,6 +32,7 @@
     "express": "^5.2.1",
     "livekit-server-sdk": "^2.15.4",
     "openai": "^4.79.1",
+    "p-retry": "^7.1.1",
     "winston": "^3.19.0",
     "zod": "^3.25.76"
   }

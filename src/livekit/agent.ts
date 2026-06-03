@@ -1,157 +1,200 @@
-import { llm, voice } from '@livekit/agents';
-import { z } from 'zod';
 import {
-  fetchPropertyDetails,
-  fetchShowingRequests,
-  getConversationContext,
-  updateShowings,
-  updatePropertyRecords,
-  manageRentalSpecialist,
-  triggerWorkflow,
-  setTag,
-} from '../tools/executors.js';
-import { MARCUS_SYSTEM_PROMPT } from './instructions.js';
+  type JobContext,
+  type JobProcess,
+  defineAgent,
+  llm,
+  voice,
+} from '@livekit/agents';
+import * as openai from '@livekit/agents-plugin-openai';
+import type { TTSVoices } from '@livekit/agents-plugin-openai';
+import * as silero from '@livekit/agents-plugin-silero';
+import { z } from 'zod';
+import { logger } from '../lib/logger.js';
+import { MARCUS_SYSTEM_PROMPT, MARCUS_FIRST_MESSAGE } from './instructions.js';
+import {
+  checkPropertyAvailability,
+  updatePropertyStatus,
+  scheduleCallback,
+  sendTextMessage,
+  logConversation,
+} from '../tools/livekitTools.js';
 
-const fetchPropertyDetailsTool = llm.tool({
+// ---------------------------------------------------------------------------
+// Tools (function calling)
+// ---------------------------------------------------------------------------
+
+const checkPropertyAvailabilityTool = llm.tool({
   description:
-    'Fetches detailed information for a single property from the external TRP property API using the backend property ID.',
+    'Look up the current availability, status, address, pet policy, and remarks for the property/properties or showing(s) under discussion. Call this at the start of the call.',
   parameters: z.object({
-    propertyId: z.string().describe('Backend property ID string'),
+    showingIds: z.string().optional().describe('Comma-separated showing request IDs'),
+    propertyIds: z.string().optional().describe('Comma-separated property IDs'),
   }),
-  execute: async (params) =>
-    fetchPropertyDetails(params as Record<string, unknown>),
+  execute: async (params) => checkPropertyAvailability(params as Record<string, unknown>),
 });
 
-const fetchShowingRequestsTool = llm.tool({
+const updatePropertyStatusTool = llm.tool({
   description:
-    'Fetches showing requests from the database. Use to list showings by status, user, or date before starting a call.',
+    'Update the showing status in Supabase once an outcome is clear. Category is the canonical bucket; status is the exact human-readable string.',
   parameters: z.object({
-    id: z.string().optional().describe('Showing ID or comma-separated IDs'),
-    propertyId: z.string().optional().describe('Property ID or comma-separated IDs'),
-    groupName: z.string().optional().describe('Filter by group name'),
-    status: z
-      .string()
-      .optional()
-      .describe('Filter by status: pending, confirmed, cancelled, scheduled, done, rescheduled'),
-    userId: z.string().uuid().optional().describe('Filter by user ID'),
-    scheduledDate: z
-      .string()
-      .optional()
-      .describe('Filter by scheduled date (YYYY-MM-DD)'),
-    limit: z.number().optional().describe('Max results (default 50, max 100)'),
-  }),
-  execute: async (params) =>
-    fetchShowingRequests(params as Record<string, unknown>),
-});
-
-const getConversationContextTool = llm.tool({
-  description:
-    'Fetches property and showing context for a batch before or during the call. Call first with showing IDs to get addresses, tags, remarks, and status.',
-  parameters: z.object({
-    showingIds: z
-      .string()
-      .describe('Comma-separated showing request IDs (UUIDs)'),
-  }),
-  execute: async (params) =>
-    getConversationContext(params as Record<string, unknown>),
-});
-
-const updateShowingsTool = llm.tool({
-  description:
-    'Updates property showings table: category (Pending/Canceled/Confirmed), status string, and optionally releases rental specialist and triggers route plan.',
-  parameters: z.object({
-    showingIds: z.string().describe('Comma-separated showing IDs or single ID to update'),
+    showingIds: z.string().describe('Comma-separated showing IDs to update'),
     category: z
-      .string()
-      .describe(
-        'Category: Pending Showings, Canceled Showings, or Confirmed Showings'
-      ),
+      .enum(['Pending Showings', 'Canceled Showings', 'Confirmed Showings'])
+      .describe('Canonical showing category'),
     status: z
       .string()
-      .describe(
-        'Status string e.g. Unavailable - Tenanted, Unavailable - No Pets Allowed, Temporarily Unavailable - Landlord Reviewing Offer'
-      ),
+      .describe('Exact status string, e.g. "Unavailable - Tenanted" or "Temporarily Unavailable - Landlord Reviewing Offer"'),
     releaseSpecialist: z
       .boolean()
       .optional()
-      .describe('Whether to release the assigned rental specialist'),
-    triggerRoutePlan: z
-      .boolean()
-      .optional()
-      .describe('Whether to run Showings Route Plan - Final workflow'),
+      .describe('Release the assigned rental specialist for these showings'),
   }),
-  execute: async (params) => updateShowings(params as Record<string, unknown>),
+  execute: async (params) => updatePropertyStatus(params as Record<string, unknown>),
 });
 
-const updatePropertyRecordsTool = llm.tool({
+const scheduleCallbackTool = llm.tool({
   description:
-    'Updates property records: pets allowed flag and/or offer requirements. Use when agent confirms pets policy or adds new offer criteria.',
+    'Record that we should follow up with the listing agent later (e.g. they need time to confirm pets, or asked to be called back).',
   parameters: z.object({
-    propertyIds: z.string().describe('Comma-separated property IDs'),
-    petsAllowed: z.boolean().optional().describe('Whether pets are allowed at the property'),
-    offerRequirements: z
-      .string()
-      .optional()
-      .describe('Additional offer criteria specified by listing agent (Tag B)'),
+    showingIds: z.string().optional().describe('Comma-separated showing IDs this callback relates to'),
+    callbackAt: z.string().describe('When to follow up — ISO timestamp or natural description (e.g. "tomorrow 2pm")'),
+    reason: z.string().optional().describe('Why we are calling back'),
+    channel: z.enum(['call', 'text']).optional().describe('Preferred follow-up channel (default call)'),
   }),
-  execute: async (params) =>
-    updatePropertyRecords(params as Record<string, unknown>),
+  execute: async (params) => scheduleCallback(params as Record<string, unknown>),
 });
 
-const manageRentalSpecialistTool = llm.tool({
+const sendTextMessageTool = llm.tool({
   description:
-    'Release or confirm rental specialist assignment for given showings.',
+    'Send an SMS follow-up to the listing agent (e.g. a confirmation or summary). Use when the agent prefers text.',
   parameters: z.object({
-    action: z.enum(['release', 'confirm']).describe('release or confirm'),
-    showingIds: z.string().describe('Comma-separated showing IDs'),
+    to: z.string().optional().describe('Destination phone number (E.164). Defaults to the configured trial number.'),
+    body: z.string().describe('The message text to send'),
+    showingId: z.string().optional().describe('Related showing ID, if any'),
   }),
-  execute: async (params) =>
-    manageRentalSpecialist(params as Record<string, unknown>),
+  execute: async (params) => sendTextMessage(params as Record<string, unknown>),
 });
 
-const triggerWorkflowTool = llm.tool({
+const logConversationTool = llm.tool({
   description:
-    'Triggers a workflow. Use Showings Route Plan - Final after cancellations/confirmations, or Brokerage Remarks to be Addressed by Tenant for Tag J.',
+    'Save a transcript or summary of the conversation to Supabase. Use to record the outcome and key points.',
   parameters: z.object({
-    workflowName: z
-      .string()
-      .describe(
-        'Workflow name: Showings Route Plan - Final or Brokerage Remarks to be Addressed by Tenant'
-      ),
-    context: z
-      .string()
-      .optional()
-      .describe('Optional context (e.g. showing IDs) for the workflow'),
+    showingIds: z.string().optional().describe('Comma-separated showing IDs this conversation relates to'),
+    transcript: z.string().optional().describe('Full or partial transcript text'),
+    summary: z.string().optional().describe('Short summary of the call'),
+    outcome: z.string().optional().describe('Resulting outcome (e.g. "confirmed", "cancelled - tenanted")'),
   }),
-  execute: async (params) => triggerWorkflow(params as Record<string, unknown>),
+  execute: async (params) => logConversation(params as Record<string, unknown>),
 });
 
-const setTagTool = llm.tool({
-  description:
-    'Sets a tag on showing/property batch. Tags: A (client package), B (offer criteria), C (wait offer), D (remark), E (pets pending), F (agent follow-up), G (we follow-up), H (pets unknown), J (under review).',
-  parameters: z.object({
-    tag: z
-      .string()
-      .describe('Tag letter: A, B, C, D, E, F, G, H, or J'),
-    showingIds: z.string().describe('Comma-separated showing IDs'),
-  }),
-  execute: async (params) => setTag(params as Record<string, unknown>),
-});
+// ---------------------------------------------------------------------------
+// Agent
+// ---------------------------------------------------------------------------
 
 export class MarcusAgent extends voice.Agent {
   constructor() {
     super({
       instructions: MARCUS_SYSTEM_PROMPT,
       tools: {
-        fetch_property_details: fetchPropertyDetailsTool,
-        fetch_showing_requests: fetchShowingRequestsTool,
-        get_conversation_context: getConversationContextTool,
-        update_showings: updateShowingsTool,
-        update_property_records: updatePropertyRecordsTool,
-        manage_rental_specialist: manageRentalSpecialistTool,
-        trigger_workflow: triggerWorkflowTool,
-        set_tag: setTagTool,
+        check_property_availability: checkPropertyAvailabilityTool,
+        update_property_status: updatePropertyStatusTool,
+        schedule_callback: scheduleCallbackTool,
+        send_text_message: sendTextMessageTool,
+        log_conversation: logConversationTool,
       },
     });
   }
 }
+
+// STT: OpenAI Whisper · LLM: OpenAI GPT-4o · TTS: OpenAI ("ash") · VAD: Silero
+function createSession(ctx: JobContext): voice.AgentSession {
+  return new voice.AgentSession({
+    vad: ctx.proc.userData.vad as silero.VAD,
+    stt: new openai.STT({ model: 'whisper-1', language: 'en' }),
+    llm: new openai.LLM({ model: 'gpt-4o' }),
+    tts: new openai.TTS({
+      model: 'gpt-4o-mini-tts',
+      voice: (process.env.LIVEKIT_TTS_VOICE_ID ?? 'ash') as TTSVoices,
+    }),
+  });
+}
+
+// ---------------------------------------------------------------------------
+// Entry point
+// ---------------------------------------------------------------------------
+
+export default defineAgent({
+  prewarm: async (proc: JobProcess) => {
+    proc.userData.vad = await silero.VAD.load();
+  },
+
+  entry: async (ctx: JobContext) => {
+    const transcript: string[] = [];
+    let persisted = false;
+
+    // Persist the captured transcript exactly once (on close or shutdown).
+    const persistTranscript = async (outcome: string): Promise<void> => {
+      if (persisted) return;
+      persisted = true;
+      if (!transcript.length) return;
+      await logConversation({ transcript: transcript.join('\n'), outcome });
+    };
+
+    try {
+      await ctx.connect();
+      logger.info('agent connected to room', { room: ctx.room.name });
+
+      // Wait for the person being called to join before starting the conversation.
+      const participant = await ctx.waitForParticipant();
+      logger.info('participant joined; starting conversation', {
+        room: ctx.room.name,
+        participant: participant.identity,
+      });
+
+      const session = createSession(ctx);
+
+      // Build the transcript as items are added.
+      session.on(voice.AgentSessionEventTypes.ConversationItemAdded, (ev) => {
+        const text = ev.item.textContent;
+        if (text) transcript.push(`${ev.item.role}: ${text}`);
+      });
+
+      // Log pipeline errors (STT/LLM/TTS) without tearing down the call.
+      session.on(voice.AgentSessionEventTypes.Error, (ev) => {
+        logger.error('agent session error', {
+          room: ctx.room.name,
+          error: ev.error instanceof Error ? ev.error.message : String(ev.error),
+        });
+      });
+
+      // Call drop / normal end: save the transcript best-effort.
+      session.on(voice.AgentSessionEventTypes.Close, (ev) => {
+        logger.info('session closed', { room: ctx.room.name, reason: String(ev.reason) });
+        void persistTranscript(String(ev.reason));
+      });
+
+      // Final safety net on worker shutdown / abrupt disconnect.
+      ctx.addShutdownCallback(async () => {
+        await persistTranscript('shutdown');
+      });
+
+      await session.start({
+        agent: new MarcusAgent(),
+        room: ctx.room,
+      });
+
+      // Open the conversation following the WORKFLOW.md greeting.
+      await session.generateReply({
+        instructions: `Greet the listing agent naturally, in your own words, opening with: "${MARCUS_FIRST_MESSAGE}"`,
+      });
+    } catch (err) {
+      logger.error('agent entry failed', {
+        room: ctx.room?.name,
+        error: err instanceof Error ? err.message : String(err),
+        stack: err instanceof Error ? err.stack : undefined,
+      });
+      await persistTranscript('error');
+      throw err;
+    }
+  },
+});
