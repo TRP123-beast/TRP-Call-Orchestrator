@@ -37,9 +37,8 @@ Current focus: **Listing Agent – Call #1 (Outbound)** — see `docs/listing-ag
 - Next.js 16 / React 19 / Tailwind v4
 - `livekit-client`, `livekit-server-sdk`
 
-> **Note:** `node-cron`, `p-retry`, and `winston` are listed in `package.json` but are not
-> yet imported anywhere in `src/`. There is currently **no test suite** (no Jest) and **no
-> SMS/telephony integration** (the `TRIAL_NUMBER` env var is reserved but unused).
+> **Note:** there is currently **no test suite** (no Jest) and **no SMS/telephony
+> integration** (the `TRIAL_NUMBER` env var is reserved but unused).
 
 ---
 
