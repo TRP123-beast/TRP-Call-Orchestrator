@@ -3,11 +3,14 @@ import express, { type Request, type Response, type NextFunction } from 'express
 import { executeTool } from './tools/executors';
 import { logger } from './lib/logger';
 import { getStatusReport } from './lib/serviceStatus';
+import { getSmsService } from './services/sms';
 
 const app = express();
 const PORT = Number(process.env.PORT ?? 3000);
 
 app.use(express.json({ limit: '1mb' }));
+// Twilio posts inbound-SMS webhooks as application/x-www-form-urlencoded.
+app.use(express.urlencoded({ extended: false }));
 
 // Request logging — records method, path, status, and duration for every request.
 app.use((req: Request, res: Response, next: NextFunction) => {
@@ -49,6 +52,41 @@ app.post('/api/tools/run', async (req: Request, res: Response, next: NextFunctio
   try {
     const result = await executeTool(name, args);
     res.json({ result });
+  } catch (err) {
+    next(err);
+  }
+});
+
+// Inbound SMS webhook (Twilio). Parses the provider payload, runs the text-branch
+// reply flow, and returns empty TwiML so Twilio does not send its own auto-reply.
+app.post('/api/sms/webhook', async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const sms = getSmsService();
+    const inbound = sms.parseInbound(req.body as Record<string, unknown>);
+    if (!inbound.from || !inbound.body) {
+      res.status(400).json({ error: 'Missing From/Body in webhook payload' });
+      return;
+    }
+    await sms.handleInbound(inbound);
+    res
+      .type('text/xml')
+      .send('<?xml version="1.0" encoding="UTF-8"?><Response></Response>');
+  } catch (err) {
+    next(err);
+  }
+});
+
+// Simulate an inbound SMS (for the mock/demo flow). Body: { from, to?, body }.
+app.post('/api/sms/simulate', async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const { from, to, body } = req.body as { from?: string; to?: string; body?: string };
+    if (!from || !body) {
+      res.status(400).json({ error: 'Body must include "from" and "body"' });
+      return;
+    }
+    const sms = getSmsService();
+    const reply = await sms.handleInbound({ from, to: to ?? sms.fromNumber(), body });
+    res.json({ ok: true, provider: sms.providerName, reply });
   } catch (err) {
     next(err);
   }

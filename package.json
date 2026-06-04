@@ -4,6 +4,7 @@
     "start": "ts-node src/index.ts",
     "build": "tsc",
     "text:dev": "tsx src/text-demo.ts",
+    "test:sms": "tsx src/test-sms.ts",
     "livekit:download-files": "tsx src/livekit/main.ts download-files",
     "livekit:dev": "tsx src/livekit/main.ts dev",
     "livekit:start": "tsx src/livekit/main.ts start",
@@ -33,6 +34,7 @@
     "livekit-server-sdk": "^2.15.4",
     "openai": "^4.79.1",
     "p-retry": "^7.1.1",
+    "twilio": "^6.0.2",
     "winston": "^3.19.0",
     "zod": "^3.25.76"
   }
