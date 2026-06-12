@@ -4,6 +4,8 @@ import { executeTool } from './tools/executors';
 import { logger } from './lib/logger';
 import { getStatusReport } from './lib/serviceStatus';
 import { getSmsService } from './services/sms';
+import { listMessages, updateStatus } from './services/sms/messageLog';
+import { SMS_CONSOLE_HTML } from './services/sms/console-page';
 
 const app = express();
 const PORT = Number(process.env.PORT ?? 3000);
@@ -90,6 +92,41 @@ app.post('/api/sms/simulate', async (req: Request, res: Response, next: NextFunc
   } catch (err) {
     next(err);
   }
+});
+
+// Send an outbound SMS directly (used by the console). Body: { to, body }.
+app.post('/api/sms/send', async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const { to, body } = req.body as { to?: string; body?: string };
+    if (!to || !body) {
+      res.status(400).json({ error: 'Body must include "to" and "body"' });
+      return;
+    }
+    const sms = getSmsService();
+    const result = await sms.send(to, body);
+    res.json({ ok: true, provider: sms.providerName, result });
+  } catch (err) {
+    next(err);
+  }
+});
+
+// All logged messages with statuses, newest first (powers the console).
+app.get('/api/sms/messages', (_req: Request, res: Response) => {
+  res.json({ messages: listMessages() });
+});
+
+// Twilio delivery-status callback — updates a message's status (sent/delivered/failed).
+app.post('/api/sms/status', (req: Request, res: Response) => {
+  const b = req.body as Record<string, string>;
+  const sid = b.MessageSid ?? b.messageSid;
+  const status = b.MessageStatus ?? b.status;
+  if (sid && status) updateStatus(sid, status);
+  res.sendStatus(200);
+});
+
+// Browser SMS test console for end-to-end demoing without a phone.
+app.get('/sms-demo', (_req: Request, res: Response) => {
+  res.type('html').send(SMS_CONSOLE_HTML);
 });
 
 // 404 handler — any unmatched route.

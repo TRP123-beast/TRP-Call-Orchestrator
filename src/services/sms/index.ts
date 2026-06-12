@@ -2,6 +2,7 @@ import { logger } from '../../lib/logger';
 import { MARCUS_SYSTEM_PROMPT } from '../../livekit/instructions';
 import { formatProfessional } from './format';
 import { logMessage } from './store';
+import { recordMessage, simulateOutboundLifecycle, nextInboundId } from './messageLog';
 import { MockProvider } from './mock-provider';
 import { TwilioProvider } from './twilio-provider';
 import type { SmsProvider, SmsSendResult, InboundSms } from './types';
@@ -55,6 +56,21 @@ export class SmsService {
   async send(to: string, rawBody: string): Promise<SmsSendResult> {
     const body = formatProfessional(rawBody);
     const result = await this.provider.sendSMS(to, body);
+
+    // In-memory log for the console. Mock starts at "queued" and is advanced to
+    // sent → delivered so testers see the full lifecycle.
+    const isMock = this.provider.name === 'mock';
+    recordMessage({
+      id: result.sid,
+      direction: 'outbound',
+      from: this.provider.fromNumber(),
+      to,
+      body,
+      status: isMock ? 'queued' : result.status,
+      provider: this.provider.name,
+    });
+    if (isMock) simulateOutboundLifecycle(result.sid);
+
     await logMessage({
       provider: this.provider.name,
       direction: 'outbound',
@@ -76,6 +92,15 @@ export class SmsService {
    * workflow over text, send the reply, and return the reply text.
    */
   async handleInbound(inbound: InboundSms): Promise<string> {
+    recordMessage({
+      id: inbound.sid ?? nextInboundId(),
+      direction: 'inbound',
+      from: inbound.from,
+      to: inbound.to,
+      body: inbound.body,
+      status: 'received',
+      provider: this.provider.name,
+    });
     await logMessage({
       provider: this.provider.name,
       direction: 'inbound',
