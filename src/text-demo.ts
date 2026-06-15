@@ -2,7 +2,7 @@ import 'dotenv/config';
 import readline from 'node:readline';
 import { stdin as input, stdout as output } from 'node:process';
 import OpenAI from 'openai';
-import { MARCUS_SYSTEM_PROMPT } from './livekit/instructions.js';
+import { MARCUS_SYSTEM_PROMPT } from './agent/instructions.js';
 
 type ChatRole = 'system' | 'user' | 'assistant';
 

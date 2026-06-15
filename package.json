@@ -4,14 +4,7 @@
     "start": "ts-node src/index.ts",
     "build": "tsc",
     "text:dev": "tsx src/text-demo.ts",
-    "test:sms": "tsx src/test-sms.ts",
-    "livekit:download-files": "tsx src/livekit/main.ts download-files",
-    "livekit:dev": "tsx src/livekit/main.ts dev",
-    "livekit:start": "tsx src/livekit/main.ts start",
-    "livekit:server": "./start-livekit.sh",
-    "livekit:test-playground": "tsx src/livekit/create-test-room.ts",
-    "livekit:test-outbound": "tsx src/livekit/test-outbound.ts",
-    "test:livekit": "tsx src/test-livekit-connection.ts"
+    "test:sms": "tsx src/test-sms.ts"
   },
   "devDependencies": {
     "@types/express": "^5.0.6",
@@ -22,20 +15,18 @@
     "typescript": "^5.9.3"
   },
   "dependencies": {
-    "@livekit/agents": "^1.0.46",
-    "@livekit/agents-plugin-livekit": "^1.0.46",
-    "@livekit/agents-plugin-openai": "^1.0.46",
-    "@livekit/agents-plugin-silero": "^1.0.46",
-    "@livekit/noise-cancellation-node": "^0.1.9",
+    "@fastify/formbody": "^8.0.2",
+    "@fastify/websocket": "^11.2.0",
     "@supabase/supabase-js": "^2.97.0",
     "axios": "^1.13.5",
     "dotenv": "^17.3.1",
     "express": "^5.2.1",
-    "livekit-server-sdk": "^2.15.4",
-    "openai": "^4.79.1",
+    "fastify": "^5.8.5",
+    "openai": "^4.104.0",
     "p-retry": "^7.1.1",
     "twilio": "^6.0.2",
     "winston": "^3.19.0",
+    "ws": "^8.21.0",
     "zod": "^3.25.76"
   }
 }

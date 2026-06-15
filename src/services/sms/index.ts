@@ -1,5 +1,5 @@
 import { logger } from '../../lib/logger';
-import { MARCUS_SYSTEM_PROMPT } from '../../livekit/instructions';
+import { MARCUS_SYSTEM_PROMPT } from '../../agent/instructions';
 import { formatProfessional } from './format';
 import { logMessage } from './store';
 import { recordMessage, simulateOutboundLifecycle, nextInboundId } from './messageLog';
