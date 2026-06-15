@@ -1,4 +1,5 @@
 import { logger } from '../../lib/logger';
+import { askForge } from '../llm';
 import { MARCUS_SYSTEM_PROMPT } from '../../agent/instructions';
 import { formatProfessional } from './format';
 import { logMessage } from './store';
@@ -122,34 +123,22 @@ export class SmsService {
     return reply;
   }
 
-  /** Generate the agent's text reply with the Marcus/Nestr workflow prompt. */
+  /** Generate the agent's text reply via the Forge model (not OpenAI). */
   private async generateReply(from: string, inboundBody: string): Promise<string> {
-    const apiKey = process.env.OPENAI_API_KEY;
-    if (!apiKey || apiKey === 'your-openai-api-key') {
-      return FALLBACK_REPLY;
-    }
-
     try {
-      // Lazy import keeps OpenAI out of the server's boot path.
-      const { default: OpenAI } = await import('openai');
-      const client = new OpenAI({ apiKey });
-
-      const history =
-        this.histories.get(from) ??
-        [{ role: 'system', content: MARCUS_SYSTEM_PROMPT + SMS_SYSTEM_SUFFIX } as ChatMessage];
-      history.push({ role: 'user', content: inboundBody });
-
-      const response = await client.chat.completions.create({
-        model: process.env.SMS_LLM_MODEL ?? 'gpt-4o-mini',
-        messages: history,
+      // History holds only user/assistant turns; askForge prepends the system prompt.
+      const history = this.histories.get(from) ?? [];
+      const reply = await askForge(MARCUS_SYSTEM_PROMPT + SMS_SYSTEM_SUFFIX, inboundBody, {
+        history,
+        maxTokens: 200,
       });
-
-      const text = response.choices[0]?.message?.content?.trim() || FALLBACK_REPLY;
+      const text = reply.trim() || FALLBACK_REPLY;
+      history.push({ role: 'user', content: inboundBody });
       history.push({ role: 'assistant', content: text });
       this.histories.set(from, history);
       return text;
     } catch (err) {
-      logger.warn('sms: AI reply generation failed, using fallback', {
+      logger.warn('sms: Forge reply generation failed, using fallback', {
         message: err instanceof Error ? err.message : String(err),
       });
       return FALLBACK_REPLY;

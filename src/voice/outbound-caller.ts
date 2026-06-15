@@ -6,6 +6,7 @@ import { logger } from '../lib/logger';
 import { getSmsService } from '../services/sms';
 import { getListingAgentById, getPropertiesByIds, logCall } from '../services/supabase';
 import type { CallStatus } from '../models/database';
+import { startTextFlow } from '../orchestrator/text-flow';
 import { connectStreamTwiml, resolveHost, sayTwiml } from './twiml';
 
 /**
@@ -170,13 +171,26 @@ function handleNoResponse(ctx: CallContext | undefined, twilioStatus: string, to
     return;
   }
 
+  // Max direct call attempts reached → WORKFLOW.md "text preference" fallback:
+  // switch the conversation to SMS when we have the agent + property context.
+  if (ctx.agentId && ctx.propertyIds && ctx.propertyIds.length > 0) {
+    logger.info('No Response Branch: max call attempts reached — switching to text flow (SMS)', {
+      agentId: ctx.agentId,
+      attempts: ctx.attempts,
+    });
+    void startTextFlow(ctx.agentId, ctx.propertyIds).catch((err: unknown) =>
+      logger.error('startTextFlow failed', { message: err instanceof Error ? err.message : String(err) }),
+    );
+    return;
+  }
+
+  // No agent/property context (e.g. an ad-hoc test call) → brokerage escalation.
   if (!ctx.brokerageContacted) {
     ctx.brokerageContacted = true;
     logger.warn(
       `No Response Branch: ${ctx.attempts} direct attempts exhausted — next step per WORKFLOW.md §3 is to call the brokerage`,
       { agentId: ctx.agentId, to: ctx.phoneNumber },
     );
-    // (Brokerage call is a future step; logged here so the branch is observable.)
     return;
   }
 

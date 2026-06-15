@@ -1,0 +1,207 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>TRP Call Orchestrator — Dashboard</title>
+<style>
+  :root {
+    --bg: #0F1724;
+    --card: #1A2332;
+    --accent: #00B4D8;
+    --line: #2a3850;
+    --muted: #8aa0bd;
+    --text: #e6eef8;
+    --green: #34d399;
+    --amber: #fbbf24;
+    --red: #f87171;
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--text);
+    font: 14px/1.5 system-ui, Segoe UI, Roboto, sans-serif; }
+  header { padding: 16px 24px; border-bottom: 1px solid var(--line);
+    display: flex; align-items: center; gap: 12px; }
+  header h1 { font-size: 18px; margin: 0; }
+  header .dot { width: 10px; height: 10px; border-radius: 50%; background: var(--accent);
+    box-shadow: 0 0 12px var(--accent); }
+  header .health { margin-left: auto; display: flex; gap: 14px; font-size: 12px; color: var(--muted); }
+  header .health b { color: var(--text); font-weight: 600; }
+  .grid { display: grid; gap: 16px; padding: 20px 24px;
+    grid-template-columns: repeat(2, minmax(0, 1fr)); max-width: 1200px; margin: 0 auto; }
+  .card { background: var(--card); border: 1px solid var(--line); border-radius: 14px; padding: 16px; }
+  .card h2 { font-size: 13px; text-transform: uppercase; letter-spacing: .08em;
+    color: var(--accent); margin: 0 0 12px; }
+  label { display: block; font-size: 11px; color: var(--muted); margin: 8px 0 4px; }
+  input, textarea {
+    width: 100%; background: #0d1626; border: 1px solid var(--line); color: var(--text);
+    border-radius: 8px; padding: 8px 10px; font: inherit; }
+  textarea { resize: vertical; min-height: 56px; }
+  button {
+    margin-top: 12px; background: var(--accent); color: #04222b; border: 0; border-radius: 8px;
+    padding: 9px 16px; font-weight: 700; cursor: pointer; }
+  button:active { transform: translateY(1px); }
+  button.secondary { background: #25405a; color: var(--text); }
+  .result { margin-top: 10px; font-size: 12px; color: var(--muted); white-space: pre-wrap; min-height: 16px; }
+  .list { display: flex; flex-direction: column; gap: 8px; max-height: 320px; overflow-y: auto; }
+  .row { background: #0d1626; border: 1px solid var(--line); border-radius: 10px; padding: 10px 12px; }
+  .row .top { display: flex; justify-content: space-between; gap: 8px; font-size: 12px; color: var(--muted); }
+  .row .body { margin-top: 4px; white-space: pre-wrap; }
+  .pill { font-size: 10px; text-transform: uppercase; letter-spacing: .04em;
+    padding: 2px 8px; border-radius: 999px; background: #0b1220; border: 1px solid var(--line); }
+  .pill.completed, .pill.delivered, .pill.confirmed { color: var(--green); }
+  .pill.initiated, .pill.queued, .pill.ringing, .pill.sent { color: var(--accent); }
+  .pill.no_answer, .pill.failed, .pill.busy { color: var(--red); }
+  .pill.received { color: var(--amber); }
+  .msg { max-width: 80%; padding: 8px 11px; border-radius: 12px; }
+  .msg.inbound { align-self: flex-start; background: #143247; border-bottom-left-radius: 3px; }
+  .msg.outbound { align-self: flex-end; background: #1d3a2e; border-bottom-right-radius: 3px; }
+  .msg .meta { font-size: 10px; color: var(--muted); margin-bottom: 3px; }
+  .empty { color: var(--muted); text-align: center; padding: 24px 0; }
+  .muted { color: var(--muted); font-size: 11px; }
+  .full { grid-column: 1 / -1; }
+</style>
+</head>
+<body>
+<header>
+  <span class="dot"></span>
+  <h1>TRP Call Orchestrator</h1>
+  <div class="health" id="health">
+    <span>Whisper: <b id="h-whisper">…</b></span>
+    <span>LLM: <b id="h-llm">…</b></span>
+    <span>Twilio: <b id="h-twilio">…</b></span>
+  </div>
+</header>
+
+<div class="grid">
+  <!-- Quick Actions -->
+  <section class="card">
+    <h2>Quick Actions</h2>
+    <div style="display:grid; grid-template-columns:1fr 1fr; gap:14px;">
+      <div>
+        <strong>📞 Call Agent</strong>
+        <label>Listing agent ID</label>
+        <input id="agentId" value="aa000000-0000-0000-0000-000000000001" />
+        <label>Property IDs (comma-separated)</label>
+        <input id="propertyIds" value="dd000000-0000-0000-0000-000000000006" />
+        <button id="callBtn">Call Agent</button>
+        <div class="result" id="callResult"></div>
+      </div>
+      <div>
+        <strong>💬 Send Text</strong>
+        <label>To (E.164)</label>
+        <input id="smsTo" value="+14165551001" />
+        <label>Message</label>
+        <textarea id="smsBody">Hi, this is TRP following up about your listing — is it still available?</textarea>
+        <button id="smsBtn" class="secondary">Send Text</button>
+        <div class="result" id="smsResult"></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Active Calls -->
+  <section class="card">
+    <h2>Active Calls</h2>
+    <div class="list" id="activeCalls"><div class="empty">No active calls</div></div>
+  </section>
+
+  <!-- Call Logs -->
+  <section class="card">
+    <h2>Call Logs</h2>
+    <div class="list" id="callLogs"><div class="empty">No calls yet</div></div>
+  </section>
+
+  <!-- SMS Messages (thread) -->
+  <section class="card">
+    <h2>SMS Messages</h2>
+    <div class="list" id="smsThread" style="gap:10px;"><div class="empty">No messages yet</div></div>
+    <div class="muted" id="smsSource"></div>
+  </section>
+</div>
+
+<script>
+const esc = (s) => String(s ?? '').replace(/[&<>]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;' }[c]));
+const fmt = (iso) => { try { return new Date(iso).toLocaleString(); } catch { return ''; } };
+const ACTIVE = new Set(['initiated', 'ringing', 'in-progress', 'answered']);
+
+async function postJSON(url, body) {
+  const r = await fetch(url, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
+  return { ok: r.ok, data: await r.json().catch(() => ({})) };
+}
+
+document.getElementById('callBtn').onclick = async () => {
+  const agentId = document.getElementById('agentId').value.trim();
+  const propertyIds = document.getElementById('propertyIds').value.split(',').map((s) => s.trim()).filter(Boolean);
+  const out = document.getElementById('callResult');
+  out.textContent = 'Calling…';
+  const { ok, data } = await postJSON('/api/call/initiate', { agentId, propertyIds });
+  out.textContent = ok ? `✓ Call ${data.callSid} (${data.status})` : `✗ ${data.error || 'failed'}`;
+  refreshCalls();
+};
+
+document.getElementById('smsBtn').onclick = async () => {
+  const to = document.getElementById('smsTo').value.trim();
+  const body = document.getElementById('smsBody').value.trim();
+  const out = document.getElementById('smsResult');
+  if (!to || !body) { out.textContent = 'Enter a number and message.'; return; }
+  out.textContent = 'Sending…';
+  const { ok, data } = await postJSON('/api/sms/send', { to, body });
+  out.textContent = ok ? `✓ Sent (${data.sid})` : `✗ ${data.error || 'failed'}`;
+  refreshMessages();
+};
+
+function callRow(c) {
+  const ids = (c.property_ids || []).length;
+  return `<div class="row">
+    <div class="top">
+      <span>agent ${esc((c.listing_agent_id || '—').slice(0, 8))} · ${ids} prop(s)</span>
+      <span class="pill ${esc(c.status)}">${esc(c.status)}</span>
+    </div>
+    <div class="top"><span>${esc(fmt(c.created_at))}</span><span>${c.duration_seconds ? c.duration_seconds + 's' : ''}</span></div>
+    ${c.transcript ? `<div class="body">${esc(String(c.transcript).slice(0, 240))}</div>` : ''}
+  </div>`;
+}
+
+async function refreshCalls() {
+  try {
+    const { calls = [] } = await (await fetch('/api/calls/recent')).json();
+    const active = calls.filter((c) => ACTIVE.has(c.status));
+    const ac = document.getElementById('activeCalls');
+    const cl = document.getElementById('callLogs');
+    ac.innerHTML = active.length ? active.map(callRow).join('') : '<div class="empty">No active calls</div>';
+    cl.innerHTML = calls.length ? calls.map(callRow).join('') : '<div class="empty">No calls yet</div>';
+  } catch (_) { /* ignore transient */ }
+}
+
+async function refreshMessages() {
+  try {
+    const { messages = [], source } = await (await fetch('/api/messages/recent')).json();
+    const el = document.getElementById('smsThread');
+    document.getElementById('smsSource').textContent = messages.length ? `source: ${source}` : '';
+    if (!messages.length) { el.innerHTML = '<div class="empty">No messages yet</div>'; return; }
+    // newest-first from API → show chronological
+    const ordered = messages.slice().reverse();
+    el.innerHTML = ordered.map((m) => `
+      <div class="msg ${m.direction === 'inbound' ? 'inbound' : 'outbound'}">
+        <div class="meta">${m.direction === 'inbound' ? '📥 ' + esc(m.from) : '📤 ' + esc(m.to)} · ${esc(fmt(m.createdAt))} · <span class="pill ${esc(m.status)}">${esc(m.status)}</span></div>
+        <div>${esc(m.body)}</div>
+      </div>`).join('');
+  } catch (_) { /* ignore transient */ }
+}
+
+async function refreshHealth() {
+  try {
+    const { services = {} } = await (await fetch('/api/health')).json();
+    document.getElementById('h-whisper').textContent = services.whisper ?? '—';
+    document.getElementById('h-llm').textContent = services.llm ?? '—';
+    document.getElementById('h-twilio').textContent = services.twilio ?? '—';
+  } catch (_) { /* ignore */ }
+}
+
+function tick() { refreshCalls(); refreshMessages(); }
+refreshHealth();
+tick();
+setInterval(tick, 5000);          // live updates every 5s
+setInterval(refreshHealth, 30000);
+</script>
+</body>
+</html>

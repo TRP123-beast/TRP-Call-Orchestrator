@@ -43,6 +43,19 @@ export async function getListingAgentById(agentId: string): Promise<ListingAgent
   return data ?? null;
 }
 
+/** A single listing agent by phone number (null if not found). */
+export async function getListingAgentByPhone(phone: string): Promise<ListingAgent | null> {
+  const { data, error } = await getDb()
+    .from('listing_agents')
+    .select('*')
+    .eq('phone', phone)
+    .limit(1)
+    .maybeSingle();
+
+  if (error) throw new Error(`getListingAgentByPhone failed: ${error.message}`);
+  return data ?? null;
+}
+
 /** Properties for a set of ids (preserves nothing about order). */
 export async function getPropertiesByIds(propertyIds: string[]): Promise<Property[]> {
   if (propertyIds.length === 0) return [];
@@ -83,6 +96,30 @@ export async function updateShowingStatus(
 
   if (error) throw new Error(`updateShowingStatus failed: ${error.message}`);
   return data;
+}
+
+/** Most recent call logs (newest first) — powers the dashboard Calls panel. */
+export async function getRecentCalls(limit = 20): Promise<CallLog[]> {
+  const { data, error } = await getDb()
+    .from('call_logs')
+    .select('*')
+    .order('created_at', { ascending: false })
+    .limit(limit);
+
+  if (error) throw new Error(`getRecentCalls failed: ${error.message}`);
+  return data ?? [];
+}
+
+/** Most recent messages (newest first) — powers the dashboard SMS panel. */
+export async function getRecentMessages(limit = 50): Promise<Message[]> {
+  const { data, error } = await getDb()
+    .from('messages')
+    .select('*')
+    .order('created_at', { ascending: false })
+    .limit(limit);
+
+  if (error) throw new Error(`getRecentMessages failed: ${error.message}`);
+  return data ?? [];
 }
 
 /** Record a call. */

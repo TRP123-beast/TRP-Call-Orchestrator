@@ -1,11 +1,16 @@
 import 'dotenv/config';
+import path from 'node:path';
+import fs from 'node:fs';
 import express, { type Request, type Response, type NextFunction } from 'express';
 import { executeTool } from './tools/executors';
 import { logger } from './lib/logger';
 import { getStatusReport } from './lib/serviceStatus';
-import { getSmsService } from './services/sms';
 import { listMessages, updateStatus } from './services/sms/messageLog';
 import { SMS_CONSOLE_HTML } from './services/sms/console-page';
+import smsRouter from './routes/sms';
+import apiRouter from './routes/api';
+
+const DASHBOARD_HTML = path.join(process.cwd(), 'frontend', 'index.html');
 
 const app = express();
 const PORT = Number(process.env.PORT ?? 3000);
@@ -28,8 +33,18 @@ app.use((req: Request, res: Response, next: NextFunction) => {
   next();
 });
 
+// Inbound SMS: webhook + no-phone simulator (Forge-powered text flow).
+app.use(smsRouter);
+// Dashboard control API: call initiate, recent calls/messages, sms send, health.
+app.use(apiRouter);
+
+// Demo dashboard (served on :3000).
 app.get('/', (_req: Request, res: Response) => {
-  res.send('Marcus - TRP Listing Agent - Call #1');
+  if (fs.existsSync(DASHBOARD_HTML)) {
+    res.sendFile(DASHBOARD_HTML);
+    return;
+  }
+  res.send('TRP Call Orchestrator — dashboard not found (expected frontend/index.html)');
 });
 
 app.get('/health', (_req: Request, res: Response) => {
@@ -54,57 +69,6 @@ app.post('/api/tools/run', async (req: Request, res: Response, next: NextFunctio
   try {
     const result = await executeTool(name, args);
     res.json({ result });
-  } catch (err) {
-    next(err);
-  }
-});
-
-// Inbound SMS webhook (Twilio). Parses the provider payload, runs the text-branch
-// reply flow, and returns empty TwiML so Twilio does not send its own auto-reply.
-app.post('/api/sms/webhook', async (req: Request, res: Response, next: NextFunction) => {
-  try {
-    const sms = getSmsService();
-    const inbound = sms.parseInbound(req.body as Record<string, unknown>);
-    if (!inbound.from || !inbound.body) {
-      res.status(400).json({ error: 'Missing From/Body in webhook payload' });
-      return;
-    }
-    await sms.handleInbound(inbound);
-    res
-      .type('text/xml')
-      .send('<?xml version="1.0" encoding="UTF-8"?><Response></Response>');
-  } catch (err) {
-    next(err);
-  }
-});
-
-// Simulate an inbound SMS (for the mock/demo flow). Body: { from, to?, body }.
-app.post('/api/sms/simulate', async (req: Request, res: Response, next: NextFunction) => {
-  try {
-    const { from, to, body } = req.body as { from?: string; to?: string; body?: string };
-    if (!from || !body) {
-      res.status(400).json({ error: 'Body must include "from" and "body"' });
-      return;
-    }
-    const sms = getSmsService();
-    const reply = await sms.handleInbound({ from, to: to ?? sms.fromNumber(), body });
-    res.json({ ok: true, provider: sms.providerName, reply });
-  } catch (err) {
-    next(err);
-  }
-});
-
-// Send an outbound SMS directly (used by the console). Body: { to, body }.
-app.post('/api/sms/send', async (req: Request, res: Response, next: NextFunction) => {
-  try {
-    const { to, body } = req.body as { to?: string; body?: string };
-    if (!to || !body) {
-      res.status(400).json({ error: 'Body must include "to" and "body"' });
-      return;
-    }
-    const sms = getSmsService();
-    const result = await sms.send(to, body);
-    res.json({ ok: true, provider: sms.providerName, result });
   } catch (err) {
     next(err);
   }
@@ -146,9 +110,27 @@ app.use((err: unknown, req: Request, res: Response, _next: NextFunction) => {
   res.status(500).json({ error: message });
 });
 
-app.listen(PORT, () => {
-  logger.info(`Server running on port ${PORT}`);
+const server = app.listen(PORT, () => {
+  logger.info(`🟦 TRP dashboard + API running on http://localhost:${PORT}`);
+  logger.info(`   Dashboard: http://localhost:${PORT}/   ·   SMS console: /sms-demo`);
+  logger.info(`   Voice pipeline runs separately on :5050 (pnpm voice:dev / pnpm voice:tunnel)`);
 });
+
+// Graceful shutdown: stop accepting connections, then exit.
+let shuttingDown = false;
+function shutdown(signal: string): void {
+  if (shuttingDown) return;
+  shuttingDown = true;
+  logger.info(`${signal} received — shutting down gracefully`);
+  server.close(() => {
+    logger.info('HTTP server closed — bye');
+    process.exit(0);
+  });
+  // Force-exit if connections linger.
+  setTimeout(() => process.exit(0), 10_000).unref();
+}
+process.on('SIGTERM', () => shutdown('SIGTERM'));
+process.on('SIGINT', () => shutdown('SIGINT'));
 
 // Safety nets so a stray rejection/exception is logged rather than silently killing the process.
 process.on('unhandledRejection', (reason) => {

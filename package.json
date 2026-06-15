@@ -1,12 +1,15 @@
 {
   "scripts": {
-    "dev": "bash scripts/start-dev.sh",
-    "server:dev": "nodemon --ext ts --exec ts-node src/index.ts",
-    "start": "ts-node src/index.ts",
+    "start": "tsx src/index.ts",
+    "dev": "tsx watch src/index.ts",
     "build": "tsc",
+    "demo:seed": "tsx scripts/seed-db.ts",
     "text:dev": "tsx src/text-demo.ts",
     "test:sms": "tsx src/test-sms.ts",
+    "sms:test": "tsx src/services/sms/test-sms.ts",
+    "sms:simulate": "curl -X POST http://localhost:3000/api/sms/simulate -H 'Content-Type: application/json' -d '{\"from\":\"+15551234567\",\"body\":\"yes available\"}'",
     "voice:dev": "tsx src/voice/twilio-realtime-agent.ts",
+    "voice:tunnel": "bash scripts/start-dev.sh",
     "call:test": "tsx src/voice/outbound-call.ts",
     "call:outbound": "tsx src/voice/outbound-caller.ts",
     "twilio:configure": "tsx scripts/configure-twilio.ts"
