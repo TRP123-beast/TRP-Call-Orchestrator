@@ -1,14 +1,19 @@
 {
   "scripts": {
-    "dev": "nodemon --ext ts --exec ts-node src/index.ts",
+    "dev": "bash scripts/start-dev.sh",
+    "server:dev": "nodemon --ext ts --exec ts-node src/index.ts",
     "start": "ts-node src/index.ts",
     "build": "tsc",
     "text:dev": "tsx src/text-demo.ts",
-    "test:sms": "tsx src/test-sms.ts"
+    "test:sms": "tsx src/test-sms.ts",
+    "voice:dev": "tsx src/voice/twilio-realtime-agent.ts",
+    "call:test": "tsx src/voice/outbound-call.ts",
+    "twilio:configure": "tsx scripts/configure-twilio.ts"
   },
   "devDependencies": {
     "@types/express": "^5.0.6",
     "@types/node": "^25.2.3",
+    "@types/ws": "^8.18.1",
     "nodemon": "^3.1.11",
     "ts-node": "^10.9.2",
     "tsx": "^4.19.2",
