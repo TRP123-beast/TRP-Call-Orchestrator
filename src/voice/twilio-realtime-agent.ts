@@ -4,6 +4,8 @@ import fastifyFormBody from '@fastify/formbody';
 import fastifyWs from '@fastify/websocket';
 import WebSocket from 'ws';
 import { logger } from '../lib/logger';
+import { connectStreamTwiml, resolveHost } from './twiml';
+import { registerOutboundRoutes } from './outbound-caller';
 
 /**
  * Twilio Media Streams ↔ OpenAI Realtime API voice bridge.
@@ -221,26 +223,12 @@ async function buildServer() {
     const body = (request.body ?? {}) as Record<string, string>;
     const agentName = query.agentName ?? body.agentName ?? DEFAULT_AGENT_NAME;
     const addresses = query.addresses ?? body.addresses ?? DEFAULT_ADDRESSES;
-
-    // Stream over the same host Twilio reached us on (ngrok / deployed URL).
-    const host =
-      process.env.SERVER_URL?.replace(/^https?:\/\//, '').replace(/\/$/, '') ??
-      request.headers.host ??
-      `localhost:${PORT}`;
-
-    const twiml = `<?xml version="1.0" encoding="UTF-8"?>
-<Response>
-  <Say>${TWIML_GREETING}</Say>
-  <Connect>
-    <Stream url="wss://${host}/media-stream">
-      <Parameter name="agentName" value="${escapeXml(agentName)}" />
-      <Parameter name="addresses" value="${escapeXml(addresses)}" />
-    </Stream>
-  </Connect>
-</Response>`;
+    const host = resolveHost(request, PORT);
 
     logger.info('incoming-call → returning TwiML', { host, agentName, addresses });
-    return reply.type('text/xml').send(twiml);
+    return reply
+      .type('text/xml')
+      .send(connectStreamTwiml({ host, agentName, addresses, greeting: TWIML_GREETING }));
   });
 
   // ---- WS /media-stream : the Twilio ↔ OpenAI bridge ----
@@ -559,16 +547,10 @@ async function buildServer() {
     );
   });
 
-  return fastify;
-}
+  // Outbound calling system: /outbound-call, /call-status, /api/call/initiate.
+  registerOutboundRoutes(fastify, { port: PORT });
 
-function escapeXml(value: string): string {
-  return value
-    .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;')
-    .replace(/"/g, '&quot;')
-    .replace(/'/g, '&apos;');
+  return fastify;
 }
 
 function printStartupBanner(address: string): void {

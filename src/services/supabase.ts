@@ -2,6 +2,7 @@ import type { SupabaseClient } from '@supabase/supabase-js';
 import { getSupabaseClient } from '../lib/supabase';
 import type {
   Database,
+  ListingAgent,
   Property,
   Showing,
   ShowingCategory,
@@ -28,6 +29,27 @@ export function getDb(): SupabaseClient<Database> {
     db = getSupabaseClient() as unknown as SupabaseClient<Database>;
   }
   return db;
+}
+
+/** A single listing agent by id (null if not found). */
+export async function getListingAgentById(agentId: string): Promise<ListingAgent | null> {
+  const { data, error } = await getDb()
+    .from('listing_agents')
+    .select('*')
+    .eq('id', agentId)
+    .maybeSingle();
+
+  if (error) throw new Error(`getListingAgentById failed: ${error.message}`);
+  return data ?? null;
+}
+
+/** Properties for a set of ids (preserves nothing about order). */
+export async function getPropertiesByIds(propertyIds: string[]): Promise<Property[]> {
+  if (propertyIds.length === 0) return [];
+  const { data, error } = await getDb().from('properties').select('*').in('id', propertyIds);
+
+  if (error) throw new Error(`getPropertiesByIds failed: ${error.message}`);
+  return data ?? [];
 }
 
 /** All properties listed by a given agent. */

@@ -8,11 +8,13 @@
     "test:sms": "tsx src/test-sms.ts",
     "voice:dev": "tsx src/voice/twilio-realtime-agent.ts",
     "call:test": "tsx src/voice/outbound-call.ts",
+    "call:outbound": "tsx src/voice/outbound-caller.ts",
     "twilio:configure": "tsx scripts/configure-twilio.ts"
   },
   "devDependencies": {
     "@types/express": "^5.0.6",
     "@types/node": "^25.2.3",
+    "@types/node-cron": "^3.0.11",
     "@types/ws": "^8.18.1",
     "nodemon": "^3.1.11",
     "ts-node": "^10.9.2",
@@ -27,6 +29,7 @@
     "dotenv": "^17.3.1",
     "express": "^5.2.1",
     "fastify": "^5.8.5",
+    "node-cron": "^4.2.1",
     "openai": "^4.104.0",
     "p-retry": "^7.1.1",
     "twilio": "^6.0.2",
