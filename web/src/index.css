@@ -1,0 +1,91 @@
+@import 'tailwindcss';
+
+/* ─────────────────────────── TRP Design System ───────────────────────────
+   Tailwind v4 reads these custom properties to generate utilities, e.g.
+   --color-trp-accent → bg-trp-accent / text-trp-accent / border-trp-accent. */
+@theme {
+  --color-trp-bg: #0f1724;
+  --color-trp-surface: #1a2332;
+  --color-trp-surface-hover: #243044;
+  --color-trp-border: #2a3a52;
+  --color-trp-text: #ffffff;
+  --color-trp-muted: #94a3b8;
+  --color-trp-accent: #00b4d8;
+  --color-trp-accent-hover: #0096b4;
+  --color-trp-success: #22c55e;
+  --color-trp-warning: #f59e0b;
+  --color-trp-error: #ef4444;
+  --color-trp-purple: #a855f7;
+
+  --font-sans: 'Inter', system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+  --font-mono: 'JetBrains Mono', ui-monospace, 'SF Mono', Menlo, monospace;
+
+  --radius-card: 14px;
+}
+
+/* Base */
+html,
+body,
+#root {
+  height: 100%;
+}
+body {
+  margin: 0;
+  background: var(--color-trp-bg);
+  color: var(--color-trp-text);
+  font-family: var(--font-sans);
+  -webkit-font-smoothing: antialiased;
+}
+
+/* Quiet, themed scrollbars */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: var(--color-trp-border) transparent;
+}
+*::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+*::-webkit-scrollbar-thumb {
+  background: var(--color-trp-border);
+  border-radius: 999px;
+}
+
+/* Animations */
+@keyframes trp-pulse {
+  0%,
+  100% {
+    opacity: 1;
+    transform: scale(1);
+  }
+  50% {
+    opacity: 0.5;
+    transform: scale(1.25);
+  }
+}
+.animate-trp-pulse {
+  animation: trp-pulse 1.6s ease-in-out infinite;
+}
+
+@keyframes trp-fade-in {
+  from {
+    opacity: 0;
+    transform: translateY(4px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+.animate-trp-fade-in {
+  animation: trp-fade-in 0.25s ease-out;
+}
+
+@keyframes trp-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+.animate-trp-spin {
+  animation: trp-spin 0.7s linear infinite;
+}
