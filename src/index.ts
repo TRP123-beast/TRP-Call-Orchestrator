@@ -10,6 +10,7 @@ import { SMS_CONSOLE_HTML } from './services/sms/console-page';
 import smsRouter from './routes/sms';
 import apiRouter from './routes/api';
 import dashboardRouter from './routes/dashboard';
+import liveCallsRouter from './routes/liveCalls';
 import { startVoiceServer } from './voice/pipeline';
 
 // React dashboard (Vite build, in web/). Build it with `pnpm web:build`.
@@ -44,6 +45,8 @@ app.use(smsRouter);
 app.use(apiRouter);
 // Dashboard read API: agents, properties, stats, workflows, activity, conversations.
 app.use(dashboardRouter);
+// Live-call API: in-progress snapshot, SSE stream, end-call.
+app.use(liveCallsRouter);
 
 // Serve the built React app's static assets (JS/CSS/etc) when present.
 if (fs.existsSync(WEB_DIST)) {

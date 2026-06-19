@@ -2,7 +2,8 @@ import { useMemo, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { Phone, Plus, PhoneOff, Search } from 'lucide-react';
 import type { CallFilters } from '../api/types';
-import { getActiveCalls, getCallHistory } from '../api/calls';
+import { getCallHistory } from '../api/calls';
+import { useLiveCalls } from '../lib/useLiveCalls';
 import { ActiveCallPanel } from '../components/calls/ActiveCallPanel';
 import { CallCard } from '../components/calls/CallCard';
 import { NewCallModal } from '../components/calls/NewCallModal';
@@ -25,11 +26,7 @@ export function CallsPage() {
   const [filters, setFilters] = useState<CallFilters>({ type: 'all', status: 'all', search: '' });
   const [range, setRange] = useState<DateRange>('week');
 
-  const { data: active = [] } = useQuery({
-    queryKey: ['calls', 'active'],
-    queryFn: getActiveCalls,
-    refetchInterval: 3_000,
-  });
+  const active = useLiveCalls();
 
   const { data: history = [] } = useQuery({
     queryKey: ['calls', 'history', filters],

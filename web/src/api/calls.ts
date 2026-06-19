@@ -6,8 +6,8 @@ export const getCallHistory = (f: CallFilters) => {
   return api.get<{ calls: CallRecord[] }>(`/api/calls/history?${q}`).then((r) => r.calls);
 };
 
-export const getActiveCalls = () =>
-  api.get<{ calls: CallRecord[] }>('/api/calls/active').then((r) => r.calls);
+export const endLiveCall = (sid: string) =>
+  api.post<{ ok: boolean }>(`/api/calls/${sid}/end`, {});
 
 export const getTranscript = (id: string) =>
   api.get<{ call: CallRecord; transcript: string }>(`/api/calls/${id}/transcript`);

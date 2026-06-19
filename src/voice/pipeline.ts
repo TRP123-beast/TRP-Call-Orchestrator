@@ -14,6 +14,7 @@ import {
   generateGreeting,
   endCall,
 } from './conversation';
+import { liveCalls } from '../services/liveCalls';
 import {
   mulawToPcm,
   pcmToMulaw,
@@ -181,10 +182,12 @@ function handleMediaStream(twilioWs: WebSocket): void {
         return;
       }
       logger.info(`👤 Caller: ${transcript}`, { callSid });
+      liveCalls.addLine(callSid, 'caller', transcript);
 
       // transcript → Forge (with history) → reply text
       const reply = await generateReply(callSid, transcript);
       logger.info(`🤖 AI: ${reply}`, { callSid });
+      liveCalls.addLine(callSid, 'ai', reply);
 
       // reply → Kokoro TTS → PCM → speak back
       const pcmOut = await textToSpeech(reply);
@@ -227,13 +230,17 @@ function handleMediaStream(twilioWs: WebSocket): void {
           agentName,
           callType: greetFirst ? 'outbound_agent' : 'inbound',
         });
+        liveCalls.start(callSid, { agentName });
         logger.info('▶️  stream started', { streamSid, callSid, agentName, greetFirst });
 
         // Outbound: AI speaks first.
         if (greetFirst) {
           processing = true;
           void generateGreeting(callSid)
-            .then(textToSpeech)
+            .then((greeting) => {
+              liveCalls.addLine(callSid, 'ai', greeting);
+              return textToSpeech(greeting);
+            })
             .then((pcm) => speak(pcm))
             .catch((err: unknown) =>
               logger.error('greeting failed', {
@@ -285,6 +292,7 @@ function handleMediaStream(twilioWs: WebSocket): void {
     closed = true;
     clearInterval(vad);
     logger.info('📴 media stream disconnected', { callSid });
+    liveCalls.end(callSid);
     void endCall(callSid);
   });
 

@@ -103,3 +103,17 @@ export interface CallFilters {
   status: 'all' | 'completed' | 'no_answer' | 'voicemail' | 'failed';
   search: string;
 }
+
+export interface LiveLine {
+  role: 'caller' | 'ai';
+  text: string;
+  at: string;
+}
+export interface LiveCall {
+  callSid: string;
+  agentName: string;
+  agentPhone: string | null;
+  status: 'in-progress' | 'ended';
+  startedAt: string;
+  transcript: LiveLine[];
+}
