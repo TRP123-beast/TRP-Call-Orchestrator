@@ -5,6 +5,7 @@ import type {
   ListingAgentInsert,
   PropertyInsert,
   ShowingInsert,
+  CallLogInsert,
 } from '../src/models/database';
 import { logger } from '../src/lib/logger';
 
@@ -45,6 +46,7 @@ const properties: PropertyInsert[] = [
 ];
 
 const inDays = (n: number): string => new Date(Date.now() + n * 86_400_000).toISOString();
+const hoursAgo = (n: number): string => new Date(Date.now() - n * 3_600_000).toISOString();
 
 const showings: ShowingInsert[] = [
   { id: 'cc000000-0000-0000-0000-000000000001', property_id: 'dd000000-0000-0000-0000-000000000003', category: 'pending_showings', status: 'Temporarily Unavailable - Landlord Reviewing Offer', tags: ['C'], scheduled_at: inDays(2) },
@@ -52,7 +54,65 @@ const showings: ShowingInsert[] = [
   { id: 'cc000000-0000-0000-0000-000000000003', property_id: 'dd000000-0000-0000-0000-000000000004', category: 'canceled_showings', status: 'Unavailable - Tenanted', tags: [] },
 ];
 
-async function upsert(table: 'brokerages' | 'listing_agents' | 'properties' | 'showings', rows: unknown[]): Promise<void> {
+const calls: CallLogInsert[] = [
+  {
+    id: 'ff000000-0000-0000-0000-000000000001',
+    listing_agent_id: 'aa000000-0000-0000-0000-000000000001',
+    property_ids: ['dd000000-0000-0000-0000-000000000006'],
+    call_type: 'outbound_agent',
+    status: 'completed',
+    duration_seconds: 222,
+    created_at: hoursAgo(2),
+    transcript:
+      'AI: Hi Sarah, this is the assistant from TRP calling about 55 Mercer Street. Is the unit still available for showings?\nCaller: Yes, it is still available.\nAI: Great — are there any registered offers, and what is the pet policy?\nCaller: No offers yet, and pets are allowed.\nAI: Perfect, I will confirm a showing and send the details. Thank you!',
+  },
+  {
+    id: 'ff000000-0000-0000-0000-000000000002',
+    listing_agent_id: 'aa000000-0000-0000-0000-000000000004',
+    property_ids: ['dd000000-0000-0000-0000-000000000004'],
+    call_type: 'outbound_agent',
+    status: 'no_answer',
+    duration_seconds: null,
+    created_at: hoursAgo(5),
+    transcript: null,
+  },
+  {
+    id: 'ff000000-0000-0000-0000-000000000003',
+    listing_agent_id: 'aa000000-0000-0000-0000-000000000005',
+    property_ids: ['dd000000-0000-0000-0000-000000000010'],
+    call_type: 'outbound_agent',
+    status: 'voicemail',
+    duration_seconds: 18,
+    created_at: hoursAgo(7),
+    transcript: 'AI: Hi Lin, this is TRP calling about 161 Roehampton Ave. Please call us back or reply by text. Thanks!',
+  },
+  {
+    id: 'ff000000-0000-0000-0000-000000000004',
+    listing_agent_id: 'aa000000-0000-0000-0000-000000000003',
+    property_ids: ['dd000000-0000-0000-0000-000000000003'],
+    call_type: 'outbound_agent',
+    status: 'failed',
+    duration_seconds: null,
+    created_at: hoursAgo(26),
+    transcript: null,
+  },
+  {
+    id: 'ff000000-0000-0000-0000-000000000005',
+    listing_agent_id: 'aa000000-0000-0000-0000-000000000002',
+    property_ids: ['dd000000-0000-0000-0000-000000000002', 'dd000000-0000-0000-0000-000000000007'],
+    call_type: 'inbound',
+    status: 'completed',
+    duration_seconds: 96,
+    created_at: hoursAgo(30),
+    transcript:
+      'Caller: Hi, I am calling back about the two listings you contacted me on.\nAI: Thanks for calling back! Are both 88 Harbour and 290 Adelaide still available?\nCaller: 88 Harbour is available, 290 Adelaide is not — no pets there.\nAI: Understood, I will update both. Thank you!',
+  },
+];
+
+async function upsert(
+  table: 'brokerages' | 'listing_agents' | 'properties' | 'showings' | 'call_logs',
+  rows: unknown[],
+): Promise<void> {
   const { error } = await getDb()
     .from(table)
     .upsert(rows as never, { onConflict: 'id' });
@@ -67,7 +127,8 @@ async function main(): Promise<void> {
   await upsert('listing_agents', agents);
   await upsert('properties', properties);
   await upsert('showings', showings);
-  console.log('✅ Seed complete: 3 brokerages, 5 agents, 10 properties, 3 showings.');
+  await upsert('call_logs', calls);
+  console.log('✅ Seed complete: 3 brokerages, 5 agents, 10 properties, 3 showings, 5 calls.');
   console.log('   Demo agent: Sarah Chen  aa000000-0000-0000-0000-000000000001');
   console.log('   Demo property: 55 Mercer St  dd000000-0000-0000-0000-000000000006');
 }

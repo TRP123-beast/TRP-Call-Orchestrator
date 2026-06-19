@@ -1,8 +1,10 @@
 import { api } from '../lib/api';
-import type { CallRecord } from './types';
+import type { CallFilters, CallRecord } from './types';
 
-export const getRecentCalls = () =>
-  api.get<{ calls: CallRecord[] }>('/api/calls/recent').then((r) => r.calls);
+export const getCallHistory = (f: CallFilters) => {
+  const q = new URLSearchParams({ type: f.type, status: f.status, search: f.search }).toString();
+  return api.get<{ calls: CallRecord[] }>(`/api/calls/history?${q}`).then((r) => r.calls);
+};
 
 export const getActiveCalls = () =>
   api.get<{ calls: CallRecord[] }>('/api/calls/active').then((r) => r.calls);

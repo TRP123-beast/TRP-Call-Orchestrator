@@ -88,10 +88,18 @@ export interface SmsMessage {
 export interface CallRecord {
   id: string;
   agentId: string | null;
+  agentName?: string | null;
+  agentPhone?: string | null;
   propertyIds: string[];
   callType: string;
   status: string;
   durationSeconds: number | null;
   transcript: string | null;
   createdAt: string;
+}
+
+export interface CallFilters {
+  type: 'all' | 'outbound' | 'inbound';
+  status: 'all' | 'completed' | 'no_answer' | 'voicemail' | 'failed';
+  search: string;
 }

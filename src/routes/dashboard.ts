@@ -307,9 +307,33 @@ router.get('/api/calls/active', async (_req: Request, res: Response) => {
   try {
     const calls = await getRecentCalls(50);
     const active = calls.filter((c) => c.status === 'answered' || c.status === 'initiated');
-    res.json({ calls: active.map(toCall) });
+    res.json({ calls: await enrichCalls(active) });
   } catch (err) {
     logger.warn('active calls unavailable', { message: msg(err) });
+    res.json({ calls: [], degraded: true });
+  }
+});
+
+// Filterable history (camelCase + agent names) for the Calls page.
+//   ?type=all|outbound|inbound  ?status=all|completed|no_answer|voicemail|failed  ?search=
+router.get('/api/calls/history', async (req: Request, res: Response) => {
+  const type = String(req.query.type ?? 'all');
+  const status = String(req.query.status ?? 'all');
+  const search = String(req.query.search ?? '').toLowerCase();
+  try {
+    let calls = await getRecentCalls(200);
+    if (type !== 'all') {
+      calls = calls.filter((c) =>
+        type === 'inbound' ? c.call_type === 'inbound' : c.call_type.startsWith('outbound'),
+      );
+    }
+    if (status !== 'all') calls = calls.filter((c) => c.status === status);
+
+    let enriched = await enrichCalls(calls);
+    if (search) enriched = enriched.filter((c) => (c.agentName ?? '').toLowerCase().includes(search));
+    res.json({ calls: enriched });
+  } catch (err) {
+    logger.warn('call history unavailable', { message: msg(err) });
     res.json({ calls: [], degraded: true });
   }
 });
@@ -393,6 +417,22 @@ function toCall(c: CallLog) {
     transcript: c.transcript,
     createdAt: c.created_at,
   };
+}
+
+/** Map calls to the camelCase shape + attach agent name/phone (one lookup per agent). */
+async function enrichCalls(calls: CallLog[]) {
+  const ids = [...new Set(calls.map((c) => c.listing_agent_id).filter(Boolean))] as string[];
+  const map = new Map<string, ListingAgent>();
+  await Promise.all(
+    ids.map(async (id) => {
+      const a = await getListingAgentById(id).catch(() => null);
+      if (a) map.set(id, a);
+    }),
+  );
+  return calls.map((c) => {
+    const a = c.listing_agent_id ? map.get(c.listing_agent_id) : undefined;
+    return { ...toCall(c), agentName: a?.name ?? null, agentPhone: a?.phone ?? null };
+  });
 }
 
 function callStatusLabel(s: string): string {
