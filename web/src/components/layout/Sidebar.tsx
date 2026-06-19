@@ -2,7 +2,9 @@ import { NavLink } from 'react-router-dom';
 import {
   LayoutDashboard,
   Phone,
+  PhoneCall,
   MessageSquare,
+  MessageCircle,
   Users,
   Settings,
   Radio,
@@ -29,6 +31,8 @@ export function Sidebar({
   unread?: number;
 }) {
   const items: NavItem[] = [
+    { to: '/chat', label: 'Chat', icon: MessageCircle },
+    { to: '/webcall', label: 'Web Call', icon: PhoneCall },
     { to: '/', label: 'Dashboard', icon: LayoutDashboard },
     { to: '/calls', label: 'Calls', icon: Phone, badge: activeCalls },
     { to: '/messages', label: 'Messages', icon: MessageSquare, badge: unread },

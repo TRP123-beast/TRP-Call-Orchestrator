@@ -25,21 +25,25 @@ export const TTS_VOICE = process.env.TTS_VOICE || 'af_heart';
 /** Native sample rate of Kokoro's PCM output (24 kHz, 16-bit mono). */
 export const TTS_SAMPLE_RATE = 24000;
 
+export type TtsFormat = 'pcm' | 'mp3' | 'wav';
+
 /**
- * Synthesize speech for `text`. Returns raw PCM (16-bit LE, 24 kHz, mono) as a
- * Buffer, ready for resampling + μ-law encoding before Twilio playback.
+ * Synthesize speech for `text`. Default returns raw PCM (16-bit LE, 24 kHz,
+ * mono) for the Twilio μ-law path; pass format 'mp3'/'wav' for direct browser
+ * playback (the in-browser web call).
  */
 export async function textToSpeech(
   text: string,
   voice: string = TTS_VOICE,
+  format: TtsFormat = 'pcm',
 ): Promise<Buffer> {
   const response = await tts.audio.speech.create({
     model: TTS_MODEL,
     voice,
     input: text,
-    response_format: 'pcm', // raw PCM 24 kHz 16-bit for Twilio conversion
+    response_format: format,
   });
   const buf = Buffer.from(await response.arrayBuffer());
-  logger.info('🗣️  TTS synthesized', { chars: text.length, bytes: buf.length, voice });
+  logger.info('🗣️  TTS synthesized', { chars: text.length, bytes: buf.length, voice, format });
   return buf;
 }

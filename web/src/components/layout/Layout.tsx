@@ -8,6 +8,8 @@ import { getConversations } from '../../api/sms';
 
 const TITLES: Record<string, string> = {
   '/': 'Dashboard',
+  '/chat': 'Chat',
+  '/webcall': 'Web Call',
   '/calls': 'Calls',
   '/messages': 'Messages',
 };

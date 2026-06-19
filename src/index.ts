@@ -11,6 +11,8 @@ import smsRouter from './routes/sms';
 import apiRouter from './routes/api';
 import dashboardRouter from './routes/dashboard';
 import liveCallsRouter from './routes/liveCalls';
+import chatRouter from './routes/chat';
+import webcallRouter from './routes/webcall';
 import { startVoiceServer } from './voice/pipeline';
 
 // React dashboard (Vite build, in web/). Build it with `pnpm web:build`.
@@ -21,7 +23,8 @@ const hasReactApp = (): boolean => fs.existsSync(WEB_INDEX);
 const app = express();
 const PORT = Number(process.env.PORT ?? 3000);
 
-app.use(express.json({ limit: '1mb' }));
+// 8mb so the in-browser web call can POST short base64 audio utterances.
+app.use(express.json({ limit: '8mb' }));
 // Twilio posts inbound-SMS webhooks as application/x-www-form-urlencoded.
 app.use(express.urlencoded({ extended: false }));
 
@@ -47,6 +50,9 @@ app.use(apiRouter);
 app.use(dashboardRouter);
 // Live-call API: in-progress snapshot, SSE stream, end-call.
 app.use(liveCallsRouter);
+// User-facing: live chat with Forge + in-browser web call (Whisper→Forge→Kokoro).
+app.use(chatRouter);
+app.use(webcallRouter);
 
 // Serve the built React app's static assets (JS/CSS/etc) when present.
 if (fs.existsSync(WEB_DIST)) {
