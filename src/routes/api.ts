@@ -150,27 +150,41 @@ router.post('/api/sms/send', async (req: Request, res: Response) => {
 });
 
 // ---- GET /api/health ----
+// Reflects the self-hosted chained voice stack: Whisper (STT), Forge (LLM),
+// Kokoro (TTS), plus Twilio. Each endpoint is probed with a short timeout.
 router.get('/api/health', async (_req: Request, res: Response) => {
   const placeholder = (v: string | undefined): boolean =>
     !v || v === 'your-openai-api-key' || v.startsWith('your-');
 
-  const whisper = placeholder(process.env.OPENAI_API_KEY) ? 'missing' : 'configured';
+  const reachable = async (url: string): Promise<string> => {
+    try {
+      const r = await fetch(url, { signal: AbortSignal.timeout(3000) });
+      return r.ok || r.status === 401 ? 'reachable' : `error (${r.status})`;
+    } catch {
+      return 'unreachable';
+    }
+  };
+
+  const sttBase = (process.env.STT_SERVER_URL || 'http://localhost:3001').replace(/\/$/, '');
+  const sttHealthPath = process.env.STT_HEALTH_PATH || '/status';
+  const forgeUrl = (process.env.FORGE_URL || 'http://localhost:8000/v1').replace(/\/$/, '');
+  const ttsBase = (process.env.TTS_URL || process.env.TTS_SERVER_URL || 'http://localhost:8880').replace(
+    /\/(v1)?\/?$/,
+    '',
+  );
+
+  const [whisper, llm, tts] = await Promise.all([
+    reachable(`${sttBase}${sttHealthPath}`),
+    reachable(`${forgeUrl}/models`),
+    reachable(`${ttsBase}/v1/models`),
+  ]);
+
   const twilioReady =
     !placeholder(process.env.TWILIO_ACCOUNT_SID) && !placeholder(process.env.TWILIO_AUTH_TOKEN)
       ? 'configured'
       : 'missing';
 
-  // Probe the Forge LLM endpoint (short timeout). 401 still means reachable.
-  let llm = 'unknown';
-  const forgeUrl = process.env.FORGE_URL || 'http://66.179.10.109:8000/v1';
-  try {
-    const r = await fetch(`${forgeUrl.replace(/\/$/, '')}/models`, { signal: AbortSignal.timeout(3000) });
-    llm = r.ok || r.status === 401 ? 'reachable' : `error (${r.status})`;
-  } catch {
-    llm = 'unreachable';
-  }
-
-  res.json({ status: 'ok', services: { whisper, llm, twilio: twilioReady } });
+  res.json({ status: 'ok', services: { whisper, llm, tts, twilio: twilioReady } });
 });
 
 export default router;

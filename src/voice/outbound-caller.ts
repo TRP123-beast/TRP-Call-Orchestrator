@@ -292,10 +292,12 @@ export function registerOutboundRoutes(fastify: FastifyInstance, opts: { port: n
       return reply.type('text/xml').send(sayTwiml(voicemailMessage(agentName, firstAddress), { hangup: true }));
     }
 
-    // Human answered → connect the Media Stream (AI greets first).
+    // Human answered → connect the Media Stream. greetFirst:true tells the
+    // pipeline's /media-stream handler to synthesize an AI greeting immediately
+    // (outbound calls: the AI drives the conversation).
     const host = resolveHost(request, opts.port);
     logger.info('☎️  agent answered — connecting media stream', { callSid, host, agentName, addresses });
-    return reply.type('text/xml').send(connectStreamTwiml({ host, agentName, addresses }));
+    return reply.type('text/xml').send(connectStreamTwiml({ host, agentName, addresses, greetFirst: true }));
   });
 
   // ---- POST /call-status : Twilio call lifecycle callbacks ----

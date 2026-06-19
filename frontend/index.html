@@ -68,6 +68,7 @@
   <div class="health" id="health">
     <span>Whisper: <b id="h-whisper">…</b></span>
     <span>LLM: <b id="h-llm">…</b></span>
+    <span>TTS: <b id="h-tts">…</b></span>
     <span>Twilio: <b id="h-twilio">…</b></span>
   </div>
 </header>
@@ -193,6 +194,7 @@ async function refreshHealth() {
     const { services = {} } = await (await fetch('/api/health')).json();
     document.getElementById('h-whisper').textContent = services.whisper ?? '—';
     document.getElementById('h-llm').textContent = services.llm ?? '—';
+    document.getElementById('h-tts').textContent = services.tts ?? '—';
     document.getElementById('h-twilio').textContent = services.twilio ?? '—';
   } catch (_) { /* ignore */ }
 }

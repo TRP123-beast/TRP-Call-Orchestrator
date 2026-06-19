@@ -12,11 +12,14 @@ import { logger } from '../lib/logger';
 
 export const forge = new OpenAI({
   baseURL: process.env.FORGE_URL || 'http://66.179.10.109:8000/v1',
-  apiKey: process.env.FORGE_API_KEY || 'dummy', // vLLM ignores it, SDK requires non-empty
-  timeout: 120_000, // 32B model inference can be slow
+  // The Forge server enforces auth — FORGE_API_KEY must be the real key from .env.
+  // ('dummy' is only a last-resort fallback so the SDK can construct.)
+  apiKey: process.env.FORGE_API_KEY || 'dummy',
+  timeout: 180_000, // 32B model inference is slow — allow 180s per pipeline spec
 });
 
-export const FORGE_MODEL = process.env.FORGE_MODEL || 'trp-agent';
+// Model name as served by vLLM (matches FORGE_MODEL in .env).
+export const FORGE_MODEL = process.env.FORGE_MODEL || 'forge';
 export const TRP_WRAPPER_URL = process.env.TRP_WRAPPER_URL || 'http://66.179.10.109:5000';
 
 export type ChatTurn = { role: 'system' | 'user' | 'assistant'; content: string };
@@ -39,14 +42,29 @@ export async function askForge(
     { role: 'user', content: userMessage },
   ];
 
-  const response = await forge.chat.completions.create({
+  // Disable Qwen3 "thinking" on the vLLM side. Without this, the server emits a
+  // separate `reasoning` field and leaves `content` null — and at low max_tokens
+  // the reasoning consumes the whole budget, yielding an empty reply. The
+  // "/no_think" prompt hint alone is NOT honored by this server; the
+  // chat_template_kwargs flag is. We keep both (spec requires /no_think).
+  const params = {
     model: FORGE_MODEL,
-    messages: messages as OpenAI.Chat.Completions.ChatCompletionMessageParam[],
+    messages,
     max_tokens: options?.maxTokens ?? 512,
     temperature: options?.temperature ?? 0.3,
-  });
+    chat_template_kwargs: { enable_thinking: false },
+  };
 
-  return response.choices[0]?.message?.content ?? '';
+  const response = await forge.chat.completions.create(
+    params as unknown as OpenAI.Chat.Completions.ChatCompletionCreateParamsNonStreaming,
+  );
+
+  return stripThink(response.choices[0]?.message?.content ?? '').trim();
+}
+
+/** Defensively remove any inline <think>…</think> blocks from model output. */
+function stripThink(text: string): string {
+  return text.replace(/<think>[\s\S]*?<\/think>/gi, '').trim();
 }
 
 /** Quick chat via the TRP Wrapper API (Canadian-tenancy system prompt baked in). */
@@ -58,7 +76,7 @@ export async function askTRPWrapper(
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ message, max_tokens: 512, temperature: 0.3 }),
-    signal: AbortSignal.timeout(120_000),
+    signal: AbortSignal.timeout(180_000),
   });
 
   if (!res.ok) throw new Error(`TRP Wrapper error: ${res.status}`);

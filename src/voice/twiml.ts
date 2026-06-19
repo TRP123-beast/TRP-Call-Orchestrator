@@ -34,14 +34,19 @@ export function connectStreamTwiml(opts: {
   agentName: string;
   addresses: string;
   greeting?: string;
+  /** When true, the media-stream handler generates an AI greeting first (outbound). */
+  greetFirst?: boolean;
 }): string {
   const greeting = opts.greeting ? `\n  <Say>${escapeXml(opts.greeting)}</Say>` : '';
+  const greetFirst = opts.greetFirst
+    ? '\n      <Parameter name="greetFirst" value="true" />'
+    : '';
   return `<?xml version="1.0" encoding="UTF-8"?>
 <Response>${greeting}
   <Connect>
     <Stream url="wss://${opts.host}/media-stream">
       <Parameter name="agentName" value="${escapeXml(opts.agentName)}" />
-      <Parameter name="addresses" value="${escapeXml(opts.addresses)}" />
+      <Parameter name="addresses" value="${escapeXml(opts.addresses)}" />${greetFirst}
     </Stream>
   </Connect>
 </Response>`;

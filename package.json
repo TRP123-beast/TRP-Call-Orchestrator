@@ -8,9 +8,11 @@
     "test:sms": "tsx src/test-sms.ts",
     "sms:test": "tsx src/services/sms/test-sms.ts",
     "sms:simulate": "curl -X POST http://localhost:3000/api/sms/simulate -H 'Content-Type: application/json' -d '{\"from\":\"+15551234567\",\"body\":\"yes available\"}'",
-    "voice:dev": "tsx src/voice/twilio-realtime-agent.ts",
+    "dev:voice": "tsx src/voice/pipeline.ts",
+    "voice:dev": "tsx src/voice/pipeline.ts",
+    "voice:realtime": "tsx src/voice/twilio-realtime-agent.ts",
     "voice:tunnel": "bash scripts/start-dev.sh",
-    "call:test": "tsx src/voice/outbound-call.ts",
+    "call:test": "tsx src/voice/outbound.ts",
     "call:outbound": "tsx src/voice/outbound-caller.ts",
     "twilio:configure": "tsx scripts/configure-twilio.ts"
   },
@@ -36,6 +38,7 @@
     "openai": "^4.104.0",
     "p-retry": "^7.1.1",
     "twilio": "^6.0.2",
+    "wavefile": "^11.0.0",
     "winston": "^3.19.0",
     "ws": "^8.21.0",
     "zod": "^3.25.76"

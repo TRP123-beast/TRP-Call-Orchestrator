@@ -9,6 +9,7 @@ import { listMessages, updateStatus } from './services/sms/messageLog';
 import { SMS_CONSOLE_HTML } from './services/sms/console-page';
 import smsRouter from './routes/sms';
 import apiRouter from './routes/api';
+import { startVoiceServer } from './voice/pipeline';
 
 const DASHBOARD_HTML = path.join(process.cwd(), 'frontend', 'index.html');
 
@@ -113,8 +114,14 @@ app.use((err: unknown, req: Request, res: Response, _next: NextFunction) => {
 const server = app.listen(PORT, () => {
   logger.info(`🟦 TRP dashboard + API running on http://localhost:${PORT}`);
   logger.info(`   Dashboard: http://localhost:${PORT}/   ·   SMS console: /sms-demo`);
-  logger.info(`   Voice pipeline runs separately on :5050 (pnpm voice:dev / pnpm voice:tunnel)`);
 });
+
+// Start the Fastify voice pipeline on :5050 in the same process (Twilio webhooks
+// + Media Stream WebSocket). Failure here never takes down the dashboard.
+// Set VOICE_ENABLED=false to run the dashboard alone (e.g. `pnpm dev:voice` separately).
+if (process.env.VOICE_ENABLED !== 'false') {
+  void startVoiceServer();
+}
 
 // Graceful shutdown: stop accepting connections, then exit.
 let shuttingDown = false;
