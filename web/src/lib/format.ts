@@ -1,4 +1,4 @@
-import { formatDistanceToNowStrict } from 'date-fns';
+import { formatDistanceToNowStrict, format, isToday, isYesterday } from 'date-fns';
 
 /** Initials from a name: "Sarah Chen" → "SC", "Mike" → "MI". */
 export function initials(name: string): string {
@@ -40,6 +40,27 @@ export function relativeTime(iso: string | null | undefined): string {
 /** Wall-clock time like "3:42 PM". */
 export function clockTime(date: Date): string {
   return date.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' });
+}
+
+/** Date-separator label: "Today", "Yesterday", or "Jun 15". */
+export function dayLabel(iso: string): string {
+  try {
+    const d = new Date(iso);
+    if (isToday(d)) return 'Today';
+    if (isYesterday(d)) return 'Yesterday';
+    return format(d, 'MMM d');
+  } catch {
+    return '';
+  }
+}
+
+/** Time-of-day for a message: "3:42 PM". */
+export function timeLabel(iso: string): string {
+  try {
+    return new Date(iso).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' });
+  } catch {
+    return '';
+  }
 }
 
 /** Seconds → "3m 42s" (or "—" when null/0 for unanswered). */

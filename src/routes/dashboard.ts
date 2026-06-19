@@ -2,6 +2,7 @@ import { Router, type Request, type Response } from 'express';
 import {
   getAllAgents,
   getListingAgentById,
+  getListingAgentByPhone,
   getBrokerageById,
   getPropertiesByAgent,
   getActiveWorkflows,
@@ -61,6 +62,16 @@ function stageInfo(stage: string | null): { step: number; total: number; status:
 /** The number on the "other side" of a conversation (the agent, not us). */
 function counterparty(m: Message): string {
   return (m.direction === 'inbound' ? m.from_number : m.to_number) ?? 'unknown';
+}
+
+const looksLikePhone = (s: string): boolean => /^\+?\d{7,}$/.test(s);
+
+/** Resolve an agent by id, falling back to phone lookup (messages often lack agent_id). */
+async function resolveAgent(idOrPhone: string): Promise<ListingAgent | null> {
+  const byId = await getListingAgentById(idOrPhone).catch(() => null);
+  if (byId) return byId;
+  if (looksLikePhone(idOrPhone)) return getListingAgentByPhone(idOrPhone).catch(() => null);
+  return null;
 }
 
 // ─────────────────────────────── agents ───────────────────────────────
@@ -230,12 +241,14 @@ router.get('/api/sms/conversations', async (_req: Request, res: Response) => {
       byKey.set(key, entry);
     }
 
-    const agentIds = [...byKey.values()].map((e) => e.agentId).filter(Boolean) as string[];
-    const agentMap = new Map<string, ListingAgent>();
+    // Resolve each group's agent by id, else by phone (messages often lack agent_id).
+    const agentByKey = new Map<string, ListingAgent>();
     await Promise.all(
-      [...new Set(agentIds)].map(async (id) => {
-        const a = await getListingAgentById(id).catch(() => null);
-        if (a) agentMap.set(id, a);
+      [...byKey.entries()].map(async ([key, e]) => {
+        const agent = e.agentId
+          ? await resolveAgent(e.agentId)
+          : await resolveAgent(e.party);
+        if (agent) agentByKey.set(key, agent);
       }),
     );
 
@@ -243,10 +256,10 @@ router.get('/api/sms/conversations', async (_req: Request, res: Response) => {
       .map(([key, e]) => {
         const sorted = e.msgs.slice().sort((a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime());
         const last = sorted[sorted.length - 1];
-        const agent = e.agentId ? agentMap.get(e.agentId) : undefined;
+        const agent = agentByKey.get(key);
         return {
           key,
-          agentId: e.agentId,
+          agentId: agent?.id ?? e.agentId,
           name: agent?.name ?? e.party,
           phone: agent?.phone ?? e.party,
           lastMessage: (last?.body ?? '').slice(0, 80),
@@ -267,7 +280,7 @@ router.get('/api/sms/conversations', async (_req: Request, res: Response) => {
 router.get('/api/sms/conversation/:agentId', async (req: Request, res: Response) => {
   const agentId = String(req.params.agentId);
   try {
-    const agent = await getListingAgentById(agentId).catch(() => null);
+    const agent = await resolveAgent(agentId);
     const messages = await getRecentMessages(500);
     const thread = messages
       .filter((m) =>

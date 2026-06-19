@@ -7,5 +7,10 @@ export const getStats = () => api.get<DashboardStats>('/api/dashboard/stats');
 export const getActiveWorkflows = () =>
   api.get<{ workflows: Workflow[] }>('/api/workflows/active').then((r) => r.workflows);
 
+export const getAgentWorkflows = (agentId: string) =>
+  api
+    .get<{ workflows: Workflow[] }>(`/api/workflows/active?agentId=${agentId}`)
+    .then((r) => r.workflows);
+
 export const getActivity = () =>
   api.get<{ activity: ActivityItem[] }>('/api/activity/recent').then((r) => r.activity);
