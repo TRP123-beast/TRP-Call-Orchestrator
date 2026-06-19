@@ -12,11 +12,9 @@ import apiRouter from './routes/api';
 import dashboardRouter from './routes/dashboard';
 import { startVoiceServer } from './voice/pipeline';
 
-// React dashboard (Vite build). When web/dist exists it is served as the app;
-// until then we fall back to the legacy static frontend/index.html.
+// React dashboard (Vite build, in web/). Build it with `pnpm web:build`.
 const WEB_DIST = path.join(process.cwd(), 'web', 'dist');
 const WEB_INDEX = path.join(WEB_DIST, 'index.html');
-const LEGACY_HTML = path.join(process.cwd(), 'frontend', 'index.html');
 const hasReactApp = (): boolean => fs.existsSync(WEB_INDEX);
 
 const app = express();
@@ -52,14 +50,10 @@ if (fs.existsSync(WEB_DIST)) {
   app.use(express.static(WEB_DIST));
 }
 
-// Root: React app if built, otherwise the legacy static dashboard.
+// Root: the React app when built; otherwise a hint to build it.
 app.get('/', (_req: Request, res: Response) => {
   if (hasReactApp()) {
     res.sendFile(WEB_INDEX);
-    return;
-  }
-  if (fs.existsSync(LEGACY_HTML)) {
-    res.sendFile(LEGACY_HTML);
     return;
   }
   res.send('TRP Call Orchestrator — dashboard not built yet (run `pnpm web:build`)');
