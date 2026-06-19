@@ -9,9 +9,15 @@ import { listMessages, updateStatus } from './services/sms/messageLog';
 import { SMS_CONSOLE_HTML } from './services/sms/console-page';
 import smsRouter from './routes/sms';
 import apiRouter from './routes/api';
+import dashboardRouter from './routes/dashboard';
 import { startVoiceServer } from './voice/pipeline';
 
-const DASHBOARD_HTML = path.join(process.cwd(), 'frontend', 'index.html');
+// React dashboard (Vite build). When web/dist exists it is served as the app;
+// until then we fall back to the legacy static frontend/index.html.
+const WEB_DIST = path.join(process.cwd(), 'web', 'dist');
+const WEB_INDEX = path.join(WEB_DIST, 'index.html');
+const LEGACY_HTML = path.join(process.cwd(), 'frontend', 'index.html');
+const hasReactApp = (): boolean => fs.existsSync(WEB_INDEX);
 
 const app = express();
 const PORT = Number(process.env.PORT ?? 3000);
@@ -38,14 +44,25 @@ app.use((req: Request, res: Response, next: NextFunction) => {
 app.use(smsRouter);
 // Dashboard control API: call initiate, recent calls/messages, sms send, health.
 app.use(apiRouter);
+// Dashboard read API: agents, properties, stats, workflows, activity, conversations.
+app.use(dashboardRouter);
 
-// Demo dashboard (served on :3000).
+// Serve the built React app's static assets (JS/CSS/etc) when present.
+if (fs.existsSync(WEB_DIST)) {
+  app.use(express.static(WEB_DIST));
+}
+
+// Root: React app if built, otherwise the legacy static dashboard.
 app.get('/', (_req: Request, res: Response) => {
-  if (fs.existsSync(DASHBOARD_HTML)) {
-    res.sendFile(DASHBOARD_HTML);
+  if (hasReactApp()) {
+    res.sendFile(WEB_INDEX);
     return;
   }
-  res.send('TRP Call Orchestrator — dashboard not found (expected frontend/index.html)');
+  if (fs.existsSync(LEGACY_HTML)) {
+    res.sendFile(LEGACY_HTML);
+    return;
+  }
+  res.send('TRP Call Orchestrator — dashboard not built yet (run `pnpm web:build`)');
 });
 
 app.get('/health', (_req: Request, res: Response) => {
@@ -92,6 +109,21 @@ app.post('/api/sms/status', (req: Request, res: Response) => {
 // Browser SMS test console for end-to-end demoing without a phone.
 app.get('/sms-demo', (_req: Request, res: Response) => {
   res.type('html').send(SMS_CONSOLE_HTML);
+});
+
+// SPA fallback (Express 5 safe — no '*' route, which throws under path-to-regexp v8).
+// Any GET that isn't an API/known route gets the React index.html so client-side
+// routing (/calls, /messages) works on refresh / deep-link.
+app.use((req: Request, res: Response, next: NextFunction) => {
+  if (req.method !== 'GET' || !hasReactApp()) return next();
+  if (
+    req.path.startsWith('/api') ||
+    req.path === '/health' ||
+    req.path === '/sms-demo'
+  ) {
+    return next();
+  }
+  res.sendFile(WEB_INDEX);
 });
 
 // 404 handler — any unmatched route.

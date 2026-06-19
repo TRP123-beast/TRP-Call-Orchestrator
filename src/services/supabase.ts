@@ -2,6 +2,7 @@ import type { SupabaseClient } from '@supabase/supabase-js';
 import { getSupabaseClient } from '../lib/supabase';
 import type {
   Database,
+  Brokerage,
   ListingAgent,
   Property,
   Showing,
@@ -54,6 +55,43 @@ export async function getListingAgentByPhone(phone: string): Promise<ListingAgen
 
   if (error) throw new Error(`getListingAgentByPhone failed: ${error.message}`);
   return data ?? null;
+}
+
+/** All listing agents (newest first), for dropdowns + the agents list. */
+export async function getAllAgents(limit = 200): Promise<ListingAgent[]> {
+  const { data, error } = await getDb()
+    .from('listing_agents')
+    .select('*')
+    .order('name', { ascending: true })
+    .limit(limit);
+
+  if (error) throw new Error(`getAllAgents failed: ${error.message}`);
+  return data ?? [];
+}
+
+/** A brokerage by id (null if not found) — used to enrich agent detail. */
+export async function getBrokerageById(brokerageId: string): Promise<Brokerage | null> {
+  const { data, error } = await getDb()
+    .from('brokerages')
+    .select('*')
+    .eq('id', brokerageId)
+    .maybeSingle();
+
+  if (error) throw new Error(`getBrokerageById failed: ${error.message}`);
+  return data ?? null;
+}
+
+/** Active workflows (current_stage not completed), newest first. */
+export async function getActiveWorkflows(limit = 50): Promise<WorkflowState[]> {
+  const { data, error } = await getDb()
+    .from('workflow_state')
+    .select('*')
+    .order('updated_at', { ascending: false })
+    .limit(limit);
+
+  if (error) throw new Error(`getActiveWorkflows failed: ${error.message}`);
+  // "completed_*" stages are terminal — filter them out here (keeps the query simple).
+  return (data ?? []).filter((w) => !(w.current_stage ?? '').startsWith('completed'));
 }
 
 /** Properties for a set of ids (preserves nothing about order). */
