@@ -1,7 +1,7 @@
 {
   "scripts": {
     "start": "tsx src/index.ts",
-    "dev": "tsx watch src/index.ts",
+    "dev": "tsx scripts/preflight.ts && tsx watch src/index.ts",
     "build": "tsc",
     "web:dev": "pnpm --filter web dev",
     "web:build": "pnpm --filter web build",
