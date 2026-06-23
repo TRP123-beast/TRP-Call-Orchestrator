@@ -6,6 +6,7 @@
     "web:dev": "pnpm --filter web dev",
     "web:build": "pnpm --filter web build",
     "web:typecheck": "pnpm --filter web typecheck",
+    "tunnel": "bash scripts/tunnel.sh",
     "stack:check": "tsx scripts/check-stack.ts",
     "demo:seed": "tsx scripts/seed-db.ts",
     "text:dev": "tsx src/text-demo.ts",

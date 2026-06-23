@@ -1,0 +1,26 @@
+[Unit]
+Description=TRP model-stack SSH tunnel (Forge/Whisper/Kokoro)
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+# Adjust the path if you cloned the repo somewhere other than ~/TRP-Call-Orchestrator.
+ExecStart=%h/TRP-Call-Orchestrator/scripts/tunnel.sh
+Restart=always
+RestartSec=5
+
+[Install]
+WantedBy=default.target
+
+# ── Install as a systemd USER service (auto-start on login, auto-restart on drop) ──
+#   mkdir -p ~/.config/systemd/user
+#   cp scripts/trp-tunnel.service ~/.config/systemd/user/
+#   systemctl --user daemon-reload
+#   systemctl --user enable --now trp-tunnel.service
+#   loginctl enable-linger "$USER"     # keep it running after logout / start on boot
+#
+# Status / logs / control:
+#   systemctl --user status trp-tunnel.service
+#   journalctl --user -u trp-tunnel.service -f
+#   systemctl --user restart trp-tunnel.service
+#   systemctl --user stop trp-tunnel.service
